@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kanoodle Solver - Library Edition</title>
+    <style>
+        :root { --bg: #1a1a1a; --panel: #2d2d2d; --text: #e0e0e0; --empty: #333; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; padding: 20px; user-select: none; }
+
+        #game-container { display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; max-width: 1200px; }
+
+        /* Board Area */
+        #board-col { display: flex; flex-direction: column; gap: 15px; align-items: center; }
+        #board { display: grid; grid-template-columns: repeat(11, 45px); grid-template-rows: repeat(5, 45px); gap: 5px; background: #222; padding: 15px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .cell { width: 45px; height: 45px; background: var(--empty); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.1rem; cursor: pointer; border: 2px solid rgba(0,0,0,0.1); }
+
+        /* Controls Panel directly under Board */
+        #controls-panel { background: var(--panel); padding: 20px; border-radius: 12px; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 12px; border: 1px solid #444; }
+        #controls { display: flex; gap: 15px; }
+        button { padding: 12px 25px; font-size: 1rem; cursor: pointer; border-radius: 6px; border: none; background: #4a90e2; color: white; font-weight: bold; transition: background 0.2s; }
+        button:hover { background: #357abd; }
+        #status { font-family: monospace; color: #00ff00; min-height: 1.2em; }
+
+        /* Tray & Library Area */
+        #side-col { width: 340px; display: flex; flex-direction: column; gap: 15px; }
+        #tray { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; background: var(--panel); padding: 15px; border-radius: 12px; border: 1px solid #444; }
+        .tray-item { background: #3d3d3d; border-radius: 8px; padding: 8px; cursor: pointer; border: 2px solid transparent; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+        .tray-item.active { border-color: #4a90e2; background: #444; }
+        .tray-item.used { opacity: 0.15; filter: grayscale(1); cursor: default; }
+
+        .mini-grid { display: grid; grid-template-columns: repeat(4, 10px); grid-template-rows: repeat(4, 10px); gap: 1px; }
+        .mini-bead { width: 10px; height: 10px; border-radius: 1px; }
+
+        /* Library List */
+        #library-box { background: var(--panel); padding: 15px; border-radius: 12px; border: 1px solid #444; }
+        #local-library { max-height: 250px; overflow-y: auto; margin: 10px 0; display: flex; flex-direction: column; gap: 6px; }
+        .lib-row { display: flex; gap: 5px; }
+        .lib-btn { flex: 1; text-align: left; padding: 8px; font-size: 0.8rem; background: #333; color: #eee; border: none; border-radius: 4px; cursor: pointer; }
+        .del-btn { width: 45px; background: #800 !important; font-size: 0.7rem !important; }
+
+        .lib-meta { display: flex; justify-content: space-between; gap: 5px; margin-top: 10px; }
+        .small-btn { flex: 1; font-size: 0.7rem; padding: 8px; background: #444; }
+    </style>
+</head>
+<body>
+    <h1 style="color:#666; margin-bottom: 20px;">Kanoodle Solver</h1>
+    <div id="game-container">
+        <div id="board-col">
+            <div id="board"></div>
+            <div id="controls-panel">
+                <div id="timer-container" style="display: flex; flex-direction: column; align-items: center; margin-bottom: 15px; width: 100%;">
+                    <div id="timer-display" style="font-size: 2.2rem; font-family: monospace; color: #00ff00; background: #000; padding: 5px 25px; border-radius: 8px; border: 2px solid #444; box-shadow: inset 0 0 10px #00ff0033;">00:00.0</div>
+                    <div style="display: flex; gap: 8px; margin-top: 10px;">
+                        <button id="btn-timer-start" style="padding: 6px 12px; font-size: 0.7rem; background: #28a745;">START</button>
+                        <button id="btn-timer-pause" style="padding: 6px 12px; font-size: 0.7rem; background: #ffc107; color: black;">PAUSE</button>
+                        <button id="btn-timer-reset" style="padding: 6px 12px; font-size: 0.7rem; background: #6c757d;">RESET CLOCK</button>
+                    </div>
+                </div>
+                <div id="controls">
+                    <button id="btn-solve">SOLVE</button>
+                    <button id="btn-reset" style="background: #e24a4a;">FULL RESET</button>
+                </div>
+                <div id="status">Ready.</div>
+                <div style="font-size: 0.8rem; color: #888; text-align: center;">
+                    <b>R</b>: Rotate | <b>F</b>: Flip | <b>Right-Click</b>: Remove Piece
+                </div>
+            </div>
+        </div>
+        <div id="side-col">
+            <div id="tray"></div>
+            <div id="library-box">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 0.8rem; color:#888;">SAVED LIBRARY:</span>
+                    <button id="btn-save" style="font-size: 0.7rem; padding: 5px 10px;">SAVE CURRENT</button>
+                </div>
+                <div id="local-library"></div>
+                <div class="lib-meta">
+                    <button id="btn-download" class="small-btn">DOWNLOAD LIB</button>
+                    <button id="btn-upload" class="small-btn">UPLOAD LIB</button>
+                    <input type="file" id="file-input" style="display:none" accept=".json">
+                </div>
+            </div>
+        </div>
+    </div>
+<script>
+// --- Core Piece Data & Board Config ---
+const COLS = 11, ROWS = 5, BOARDSIZE = COLS * ROWS;
+const PIECE_DATA = {
+    'A': { color: '#FF8C00', beads: [[0,0],[1,0],[2,0],[2,1]] },
+    'B': { color: '#FF0000', beads: [[0,1],[0,2],[1,0],[1,1],[1,2]] },
+    'C': { color: '#0000FF', beads: [[0,0],[1,0],[2,0],[3,0],[3,1]] },
+    'D': { color: '#FFB6C1', beads: [[0,0],[1,0],[2,0],[2,1],[3,0]] },
+    'E': { color: '#008000', beads: [[0,0],[1,0],[2,0],[2,1],[3,1]] },
+    'F': { color: '#FFFFFF', beads: [[0,0],[1,0],[1,1]] },
+    'G': { color: '#ADD8E6', beads: [[0,0],[1,0],[2,0],[2,1],[2,2]] },
+    'H': { color: '#FF69B4', beads: [[0,0],[1,0],[1,1],[2,1],[2,2]] },
+    'I': { color: '#FFFF00', beads: [[0,0],[0,2],[1,0],[1,1],[1,2]] },
+    'J': { color: '#800080', beads: [[0,0],[1,0],[2,0],[3,0]] },
+    'K': { color: '#90EE90', beads: [[0,0],[0,1],[1,0],[1,1]] },
+    'L': { color: '#808080', beads: [[0,1],[1,0],[1,1],[1,2],[2,1]] }
+};
+
+// --- App State ---
+let board = new Array(BOARDSIZE).fill(null);
+let usedPieces = new Set();
+let selectedPiece = null;
+let rotationIndex = 0;
+let currentHoverIdx = -1;
+
+// --- Timer State ---
+let timerInterval = null;
+let startTime = 0;
+let elapsedTime = 0;
+let isTimerRunning = false;
+
+const PieceLib = {};
+Object.keys(PIECE_DATA).forEach(key => { PieceLib[key] = generateAllVariants(PIECE_DATA[key].beads); });
+
+function generateAllVariants(beads) {
+    let variants = [];
+    let current = beads;
+    for (let f = 0; f < 2; f++) {
+        for (let r = 0; r < 4; r++) {
+            variants.push(normalize(current));
+            current = current.map(([r, c]) => [c, -r]);
+        }
+        current = current.map(([r, c]) => [r, -c]);
+    }
+    let seen = new Set();
+    return variants.filter(v => {
+        let s = JSON.stringify(v);
+        if (seen.has(s)) return false;
+        seen.add(s);
+        return true;
+    }).map(v => v.map(([r, c]) => ({ r, c, offset: (r * COLS) + c })));
+}
+
+function normalize(beads) {
+    let minR = Math.min(...beads.map(b => b[0])), minC = Math.min(...beads.map(b => b[1]));
+    return beads.map(([r, c]) => [r - minR, c - minC]).sort((a,b) => a[0]-b[0] || a[1]-b[1]);
+}
+
+// --- UI Framework ---
+const boardEl = document.getElementById('board'), trayEl = document.getElementById('tray');
+const statusEl = document.getElementById('status'), libEl = document.getElementById('local-library');
+
+function init() {
+    boardEl.innerHTML = '';
+    for (let i = 0; i < BOARDSIZE; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.addEventListener('mouseenter', () => { currentHoverIdx = i; updateVisuals(); });
+        cell.addEventListener('mouseleave', () => { currentHoverIdx = -1; updateVisuals(); });
+        cell.addEventListener('click', () => placeSelected(i));
+        cell.addEventListener('contextmenu', (e) => { e.preventDefault(); removePieceAt(i); });
+        boardEl.appendChild(cell);
+    }
+
+    trayEl.innerHTML = '';
+    const library = JSON.parse(localStorage.getItem('kanoodle_lib') || '{}');
+    const header = document.createElement('div');
+    header.style.gridColumn = "span 3"; header.style.textAlign = "right"; header.style.fontSize = "0.7rem";
+    header.innerHTML = `LIBRARY ENTRIES: <span style="color:#00ff00; font-weight:bold">${Object.keys(library).length}</span>`;
+    trayEl.appendChild(header);
+
+    Object.keys(PIECE_DATA).forEach(key => {
+        const item = document.createElement('div');
+        item.className = `tray-item ${usedPieces.has(key) ? 'used' : ''} ${selectedPiece === key ? 'active' : ''}`;
+        const mini = document.createElement('div');
+        mini.className = 'mini-grid';
+        const norm = normalize(PIECE_DATA[key].beads);
+        for(let r=0; r<4; r++) {
+            for(let c=0; c<4; c++) {
+                const b = document.createElement('div'); b.className = 'mini-bead';
+                if(norm.some(bead => bead[0]===r && bead[1]===c)) b.style.backgroundColor = PIECE_DATA[key].color;
+                mini.appendChild(b);
+            }
+        }
+        item.appendChild(mini);
+        const label = document.createElement('span'); label.textContent = key;
+        item.appendChild(label);
+        item.onclick = () => { if(!usedPieces.has(key)) { selectedPiece = key; rotationIndex = 0; init(); } };
+        trayEl.appendChild(item);
+    });
+    renderBoard();
+    updateLibraryUI();
+}
+
+// --- Timer Logic ---
+function updateTimerDisplay() {
+    const time = isTimerRunning ? Date.now() - startTime + elapsedTime : elapsedTime;
+    const tMs = Math.floor(time / 100);
+    const ms = tMs % 10, tSec = Math.floor(tMs / 10), sec = tSec % 60, min = Math.floor(tSec / 60);
+    document.getElementById('timer-display').textContent = `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}.${ms}`;
+}
+
+function startTimer() { if (isTimerRunning) return; isTimerRunning = true; startTime = Date.now(); timerInterval = setInterval(updateTimerDisplay, 100); }
+function pauseTimer() { if (!isTimerRunning) return; isTimerRunning = false; elapsedTime += Date.now() - startTime; clearInterval(timerInterval); updateTimerDisplay(); }
+function resetTimer() { pauseTimer(); elapsedTime = 0; updateTimerDisplay(); }
+
+// --- Game Logic ---
+function solveMain() {
+    statusEl.textContent = "Solving...";
+    setTimeout(() => {
+        let sTime = performance.now();
+        if (backtrack()) {
+            pauseTimer(); // Stop clock on success
+            init();
+            statusEl.textContent = `Solved in ${(performance.now() - sTime).toFixed(1)}ms!`;
+        } else { statusEl.textContent = "No solution possible."; }
+    }, 50);
+}
+
+function backtrack() {
+    let hole = board.indexOf(null);
+    if (hole === -1) return true;
+    for (let pLabel of Object.keys(PieceLib)) {
+        if (usedPieces.has(pLabel)) continue;
+        for (let offsets of PieceLib[pLabel]) {
+            for (let i = 0; i < offsets.length; i++) {
+                let sPos = hole - offsets[i].offset;
+                if (canPlace(pLabel, offsets, sPos)) {
+                    offsets.forEach(o => board[sPos + o.offset] = pLabel);
+                    usedPieces.add(pLabel);
+                    if (backtrack()) return true;
+                    usedPieces.delete(pLabel);
+                    offsets.forEach(o => board[sPos + o.offset] = null);
+                }
+            }
+        }
+    }
+    return false;
+}
+
+function placeSelected(idx) {
+    if (!selectedPiece) return;
+    const variants = PieceLib[selectedPiece];
+    const offsets = variants[rotationIndex % variants.length];
+    if (canPlace(selectedPiece, offsets, idx)) {
+        offsets.forEach(o => board[idx + o.offset] = selectedPiece);
+        usedPieces.add(selectedPiece);
+        selectedPiece = null;
+        init();
+        startTimer(); // Resume clock on move
+    }
+}
+
+function canPlace(label, offsets, start) {
+    for (let o of offsets) {
+        let pos = start + o.offset;
+        if (pos < 0 || pos >= BOARDSIZE || board[pos] !== null) return false;
+        if (Math.floor(pos / COLS) !== Math.floor(start / COLS) + o.r) return false;
+    }
+    return true;
+}
+
+function removePieceAt(idx) {
+    const label = board[idx]; if (!label) return;
+    board.forEach((val, i) => { if(val === label) board[i] = null; });
+    usedPieces.delete(label);
+    init();
+    startTimer(); // Resume clock on change
+}
+
+function renderBoard() {
+    const cells = document.querySelectorAll('.cell');
+    board.forEach((val, i) => {
+        cells[i].style.backgroundColor = val ? PIECE_DATA[val].color : 'var(--empty)';
+        cells[i].textContent = val || '';
+        cells[i].style.opacity = "1"; cells[i].style.boxShadow = "none";
+        const darks = ['B', 'C', 'E', 'H', 'J', 'L'];
+        cells[i].style.color = (val && darks.includes(val)) ? 'white' : 'black';
+    });
+}
+
+function updateVisuals() { renderBoard(); if (currentHoverIdx !== -1 && selectedPiece) showGhost(currentHoverIdx); }
+
+function showGhost(hoverIdx) {
+    const variants = PieceLib[selectedPiece], offsets = variants[rotationIndex % variants.length];
+    const cells = document.querySelectorAll('.cell'), valid = canPlace(selectedPiece, offsets, hoverIdx);
+    offsets.forEach(o => {
+        const pos = hoverIdx + o.offset;
+        if (pos >= 0 && pos < BOARDSIZE && Math.floor(pos/COLS) === Math.floor(hoverIdx/COLS)+o.r) {
+            cells[pos].style.backgroundColor = PIECE_DATA[selectedPiece].color;
+            cells[pos].style.opacity = "0.4";
+            if (!valid) cells[pos].style.boxShadow = "inset 0 0 10px red";
+        }
+    });
+}
+
+// --- Library UI ---
+function updateLibraryUI() {
+    libEl.innerHTML = '';
+    const lib = JSON.parse(localStorage.getItem('kanoodle_lib') || '{}');
+    Object.keys(lib).sort().forEach(name => {
+        const row = document.createElement('div'); row.className = 'lib-row';
+        const btn = document.createElement('button'); btn.className = 'lib-btn'; btn.textContent = name;
+        btn.onclick = () => { board.fill(null); usedPieces.clear(); lib[name].forEach(p => { const offs = PieceLib[p.label][p.rot]; offs.forEach(o => board[p.pos + o.offset] = p.label); usedPieces.add(p.label); }); resetTimer(); init(); };
+        const del = document.createElement('button'); del.className = 'lib-btn del-btn'; del.textContent = 'DEL';
+        del.onclick = (e) => { e.stopPropagation(); if(confirm(`Delete "${name}"?`)) { delete lib[name]; localStorage.setItem('kanoodle_lib', JSON.stringify(lib)); init(); }};
+        row.appendChild(btn); row.appendChild(del); libEl.appendChild(row);
+    });
+}
+
+// --- Listeners ---
+window.addEventListener('keydown', (e) => {
+    if (!selectedPiece) return;
+    const variants = PieceLib[selectedPiece], key = e.key.toLowerCase();
+    if (key === 'r') { rotationIndex = (e.key === 'R') ? (rotationIndex - 1 + variants.length) % variants.length : (rotationIndex + 1) % variants.length; }
+    else if (key === 'f') { rotationIndex = (rotationIndex + 4) % variants.length; }
+    updateVisuals();
+});
+
+document.getElementById('btn-timer-start').onclick = startTimer;
+document.getElementById('btn-timer-pause').onclick = pauseTimer;
+document.getElementById('btn-timer-reset').onclick = resetTimer;
+document.getElementById('btn-solve').onclick = solveMain;
+document.getElementById('btn-reset').onclick = () => { board.fill(null); usedPieces.clear(); selectedPiece = null; resetTimer(); init(); statusEl.textContent = "Reset complete."; };
+document.getElementById('btn-save').onclick = () => {
+    const name = prompt("Name level:"); if(!name) return;
+    let data = []; usedPieces.forEach(l => {
+        let beads = []; board.forEach((v, i) => { if(v===l) beads.push(i); }); beads.sort((a,b)=>a-b);
+        let first = beads[0], vars = PieceLib[l], found = false;
+        for (let r=0; r<vars.length; r++) {
+            let offs = vars[r]; for (let bI=0; bI<offs.length; bI++) {
+                let sP = first - offs[bI].offset, matches = 0;
+                offs.forEach(o => { if(board[sP+o.offset]===l) matches++; });
+                if(matches === offs.length) { data.push({label: l, rot: r, pos: sP}); found = true; break; }
+            } if (found) break;
+        }
+    });
+    const lib = JSON.parse(localStorage.getItem('kanoodle_lib') || '{}'); lib[name] = data;
+    localStorage.setItem('kanoodle_lib', JSON.stringify(lib)); init();
+};
+document.getElementById('btn-download').onclick = () => { const blob = new Blob([localStorage.getItem('kanoodle_lib') || '{}'], {type: 'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'kanoodle_lib.json'; a.click(); };
+document.getElementById('btn-upload').onclick = () => document.getElementById('file-input').click();
+document.getElementById('file-input').onchange = (e) => { const reader = new FileReader(); reader.onload = (ev) => { const up = JSON.parse(ev.target.result); const cur = JSON.parse(localStorage.getItem('kanoodle_lib') || '{}'); localStorage.setItem('kanoodle_lib', JSON.stringify({...cur, ...up})); init(); }; reader.readAsText(e.target.files[0]); };
+
+init();
+</script>
+</body>
+</html>
